@@ -93,16 +93,43 @@ void insert()
 void printout()
 { person *p;
 for(p=phead;p!=NULL;p=p->next){
-
-
-}
+  printf("%c,%s,%d\n",p->gender,p->name,p->age);
+}return;
 }
 
 void delete()
 {
-  printf("Not available\n");
-} 
+    char targetName[50];
+    printf("Enter name to delete: ");
+    fgets(targetName, sizeof(targetName), stdin);
+    targetName[strcspn(targetName, "\n")] = '\0'; 
 
+    person *p = phead;
+    person *prev = NULL;
+
+    while (p != NULL) {
+        if (strcmp(p->name, targetName) == 0) {
+            if (prev == NULL) {
+                phead = p->next;
+            } else {
+                prev->next = p->next;
+            }
+
+            free(p->name);
+            free(p);
+            printf("Deleted: %s\n", targetName);
+            return;
+        }
+
+        prev = p;
+        p = p->next;
+    }
+
+    printf("Name not found: %s\n", targetName);
+
+
+
+} 
 void help()
 {
   printf("\"I\" is insert data.\n \"D\" is delete data.\n \"P\" is print stored data.\n");
