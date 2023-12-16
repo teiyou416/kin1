@@ -72,59 +72,33 @@ int main()
     memcpy(&in.s_addr, &cl_addr.sin_addr, 4);
     printf("Accept client %s:%d\n", inet_ntoa(in), ntohs(cl_addr.sin_port));
     msgpro(sofd, nsofd, cl_addr);
-    cliepro(sofd);
   }
 }
-
-/*[`iT[oj*/
+       /*[`iT[oj*/
 void msgpro(int sofd, int nsofd, struct sockaddr_in cl)
-{
+{  
+   int compare(const void *a,const void *b){
+   return (*(char*)a-*(char*)b);
+}
+
   int cc,cadlen,nbyte, MAXRMSG;
   struct in_addr in;
-  char rmsg[100];
-
+ char rmsg[100];
   MAXRMSG=sizeof(rmsg);
-
   while(1){
     bzero(rmsg, MAXRMSG);
     if ((cc=recv(nsofd,rmsg,MAXRMSG,0))==0) break;
     printf("Received data = %s", rmsg);
-    if(send(nsofd,rmsg,cc,0)<0)
-      perror("send");
-    
+        qsort(rmsg, strlen(rmsg), sizeof(char), compare);
+        
+        if (send(sofd, rmsg, nbyte, 0) < 0) {
+            perror("send");
+        }   
   }
-  memcpy(&in.s_addr, &cl.sin_addr, 4);
+	memcpy(&in.s_addr, &cl.sin_addr, 4);
+
   printf("Disconneted clinet %s:%d\n",inet_ntoa(in), ntohs(cl.sin_port));
   close(nsofd);
 
 }
-void cliepro(int sofd) {
-    int cc, nbyte, MAXRMSG;
-    char smsg[100], rmsg[100];
 
-    MAXRMSG = sizeof(rmsg);
-    bzero(rmsg, MAXRMSG);
-
-    while (1) {
-        printf("Enter string: ");
-        fgets(smsg, sizeof(smsg), stdin);
-        if (feof(stdin)) break;
-           int compare(const void *a,const void *b){
-   return (*(char*)a-*(char*)b);
-}
-        nbyte = strlen(smsg);
-        qsort(smsg, strlen(smsg), sizeof(char), compare);
-        
-        if (send(sofd, smsg, nbyte, 0) < 0) {
-            perror("send");
-        } else {
-            cc = recv(sofd, rmsg, MAXRMSG, 0);
-            if (cc < 0) 
-                perror("recv");
-            else {
-                printf("%s", rmsg);
-                bzero(smsg, MAXRMSG);
-            }
-        }
-    }
-}
