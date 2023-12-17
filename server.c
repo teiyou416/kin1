@@ -90,7 +90,7 @@ void msgpro(int sofd, int nsofd, struct sockaddr_in cl)
     if ((cc=recv(nsofd,rmsg,MAXRMSG,0))==0) break;
     printf("Received data = %s", rmsg);
         qsort(rmsg, strlen(rmsg), sizeof(char), compare);
-        
+    nbyte=strlen(rmsg);	    
         if (send(sofd, rmsg, nbyte, 0) < 0) {
             perror("send");
         }   
