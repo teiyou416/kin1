@@ -17,6 +17,9 @@
 void msgpro(int, int, struct sockaddr_in);
 void cliepro(int);
 volatile int client_count=0;
+void catch_SIGUSR1(int sig) {
+  printf("Current connected clients: %d\n", client_count);
+}
 void catch_sigchild(int sig)
 {
   pid_t c_pid;
@@ -26,7 +29,6 @@ void catch_sigchild(int sig)
     perror("wait");
     return;
   }
- printf("Current connected clients: %d\n", client_count);
 }
 void msgpro(int sofd, int nsofd, struct sockaddr_in cl)
 {
@@ -66,7 +68,10 @@ int main()
   struct sockaddr_in sv_addr, cl_addr;
   char shostname[20];
   struct in_addr in;
-
+ if (signal(SIGUSR1, catch_SIGUSR1) != 0) {
+    perror("Signal");
+    exit(-1);
+  }
   if (signal(SIGCHLD, catch_sigchild) != 0) {
     perror("Signal");
     exit(-1);
