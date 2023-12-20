@@ -29,6 +29,8 @@ void catch_sigchild(int sig)
     perror("wait");
     return;
   }
+printf("Child(%d) Terminate status (%d)\n", c_pid, status);
+  --client_count;
 }
 void msgpro(int sofd, int nsofd, struct sockaddr_in cl)
 {
