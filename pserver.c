@@ -16,7 +16,6 @@
 
 void msgpro(int, int, struct sockaddr_in);
 void cliepro(int);
-volatile int client_count=0;
 void catch_sigchild(int sig)
 {
   pid_t c_pid;
@@ -27,23 +26,20 @@ void catch_sigchild(int sig)
     return;
   }
   printf("Child(%d) Terminate status (%d)\n", c_pid, status);
-  --client_count;
 }
 void msgpro(int sofd, int nsofd, struct sockaddr_in cl)
 {
-int compare(const void *a,const void *b){
-    return (*(char*)a-*(char*)b);
-  }
-
   int cc,cadlen,nbyte, MAXRMSG;
   struct in_addr in;
   char rmsg[100];
   MAXRMSG=sizeof(rmsg);
+int compare(const void *a,const void *b){
+    return (*(char*)a-*(char*)b);
+  }
 while(1){
     bzero(rmsg, MAXRMSG);
     if ((cc=recv(nsofd,rmsg,MAXRMSG,0))==0) break;
     printf("Received data = %s", rmsg);
-
     qsort(rmsg,strlen(rmsg),sizeof(char),compare);
        nbyte=strlen(rmsg);
     if (send(nsofd,rmsg,nbyte,0)<0){
@@ -62,7 +58,6 @@ while(1){
 memcpy(&in.s_addr, &cl.sin_addr, 4);
   printf("Disconneted clinet %s:%d\n",inet_ntoa(in), ntohs(cl.sin_port));
   close(nsofd);
-
 }
 
 
@@ -117,13 +112,11 @@ int main()
   }
 
   while(1){
-
     cadlen = sizeof(cl_addr);
     if((nsofd=accept(sofd,(struct sockaddr *)&cl_addr, (socklen_t *)&cadlen))<0) {
       perror("accept");
       exit(-1);
     }
-++client_count;
 pid_t pid =fork();
 if(pid<0){
 perror("fork");
