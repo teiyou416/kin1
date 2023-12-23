@@ -48,7 +48,15 @@ while(1){
        nbyte=strlen(rmsg);
     if (send(nsofd,rmsg,nbyte,0)<0){
 	perror("send");
-   }
+   }else {
+      cc=recv(sofd,rmsg,MAXRMSG,0);
+      if(cc<0) perror("recv");
+      else {
+        rmsg[cc]='\0';
+	printf("%s\n",rmsg);
+	bzero(rmsg,MAXRMSG);
+      }
+    }
 
  }
 memcpy(&in.s_addr, &cl.sin_addr, 4);
