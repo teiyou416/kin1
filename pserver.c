@@ -46,7 +46,7 @@ while(1){
 	perror("send");
    }else {
       cc=recv(sofd,rmsg,MAXRMSG,0);
-      if(cc<0) perror("recv");
+      if(cc==0) perror("recv");
       else {
         rmsg[cc]='\0';
 	printf("%s\n",rmsg);
