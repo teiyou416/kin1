@@ -1,0 +1,42 @@
+set S;
+param vr;
+param vb;
+param tc;
+param pc;
+
+param p {S,S};
+param dr {S,S};
+param db {S,S};
+param cb {S,S};
+
+var pr{S,S}, >=0;
+var pb{S,S}, >=0;
+var cr{S,S}; 
+
+var x;
+var y;
+
+var w{S,S};
+var z{S,S};
+minimize objective: sum{o in S , d in S} z[o,d];
+subject to total_passenger {o in S, d in S}:
+        pr[o,d] + pb[o,d] == p[o,d];
+subject to passenger_diff {o in S, d in S}:
+        pr[o,d] - pb[o,d] 
+        == (
+        (cb[o,d] + db[o,d]/ vb * 60 * tc)
+        -(cr[o,d] + dr[o,d]/ vr * 60 * tc)
+        ) / pc * p[o,d] * 0.1;
+subject to passenger_railway_lo {o in S, d in S}:
+        pr[o,d] >= 0.1 * p[o,d];
+subject to passenger_bus_lo {o in S, d in S}:
+        pb[o,d] >= 0.1 * p[o,d];
+subject to diff_from_target {o in S, d in S}:
+        w[o,d] == pr[o,d] - 0.6 * p[o,d];
+subject to diff_up {o in S, d in S}:
+        w[o,d] <= z[o,d];
+subject to diff_lo {o in S, d in S}:
+       -z[o,d] <= w[o,d];
+subject to charge_railway {o in S, d in S}:
+        cr[o,d] == x* dr[o,d] + y;
+end;
