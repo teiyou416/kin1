@@ -39,7 +39,7 @@ void setStringToTopWin(Cwindow *, char *);
 void getStringFromTopWin(Cwindow *, char *, int);
 void setStringToBodyWin(Cwindow *, char *);
 void setFrameToBodyWin(Cwindow *, Frame *);
-int sendFrame(int, char *, Frame *, int);
+int sendFrame(int, char *, Frame *);
 void setErrorToBodyWin(Cwindow *, char *);
 
 /*C[`iNCAgj*/
@@ -122,13 +122,11 @@ void cliepro(int sofd) {
             memset(&sndFrame, 0, sizeof(sndFrame));
             getStringFromTopWin(Cwin, sndFrame.msg, sizeof(sndFrame.msg));
             setStringToBodyWin(Cwin, sndFrame.msg);
-            int msglen = strlen(sndFrame.msg);
-            if (sendFrame(sofd, hostname, &sndFrame, msglen) < 0) {
+            if (sendFrame(sofd, hostname, &sndFrame) < 0) {
                 setErrorToBodyWin(Cwin, "Connection Down");
                 endwin();
                 return;
             }
-            setStringToBodyWin(Cwin, sndFrame.msg);
         }
 
         /* \PbgÉf[^óMª êÎCf[^ð·é
@@ -154,7 +152,7 @@ void cliepro(int sofd) {
 
 Cwindow *initScreen(void) {
     Cwindow *Cwin;
-    WINDOW *H1, *H2, *H3;
+    WINDOW *H1, *H2;
 
     if (initscr() == NULL) {
         fprintf(stderr, "initscr() error\n");
@@ -171,23 +169,20 @@ Cwindow *initScreen(void) {
 
     getmaxyx(stdscr, Cwin->y, Cwin->x);
 
-    H3 = newwin(1, Cwin->x, 0, 0);
-    H1 = newwin(1, Cwin->x, 3, 0);
-    H2 = newwin(1, Cwin->x, 6, 0);
+    H1 = newwin(1, Cwin->x, 0, 0);
     Cwin->inWin = newwin(2, Cwin->x, 1, 0);
-    Cwin->outWin = newwin(Cwin->y - 7, Cwin->x, 7, 0); // 4
+    H2 = newwin(1, Cwin->x, 3, 0);
+    Cwin->outWin = newwin(Cwin->y - 4, Cwin->x, 4, 0);
     scrollok(Cwin->inWin, TRUE);
     scrollok(Cwin->outWin, TRUE);
 
     wattrset(H1, A_BOLD);
     wattrset(H2, A_BOLD);
-    wattrset(H3, A_BOLD);
     mvwprintw(H1, 0, 0, "----[Send Message]-----------");
     mvwprintw(H2, 0, 0, "----[Chat Messages]----------");
-    mvwprintw(H3, 0, 0, "----[USER NAME:]-----------");
     wrefresh(H1);
     wrefresh(H2);
-    wrefresh(H3);
+
     Cwin->M_color = 1;
     init_pair(Cwin->M_color, COLOR_WHITE, COLOR_BLACK);
     Cwin->U_color = 2;
@@ -254,13 +249,12 @@ void setFrameToBodyWin(Cwindow *Cwin, Frame *rcvFrame) {
     wrefresh(Cwin->outWin);
 }
 
-int sendFrame(int sofd, char *hostname, Frame *sndFrame, int msglen) {
+int sendFrame(int sofd, char *hostname, Frame *sndFrame) {
     int rc;
 
     sndFrame->type = UsrMsg;
     strcpy(sndFrame->hostname, hostname);
-    rc =
-        send(sofd, sndFrame, sizeof(Frame) - sizeof(sndFrame->msg) + msglen, 0);
+    rc = send(sofd, sndFrame, sizeof(Frame), 0);
 
     return rc;
 }
