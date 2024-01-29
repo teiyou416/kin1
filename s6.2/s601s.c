@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <linux/limits.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -9,8 +10,8 @@
 #include <sys/time.h> /* select()でTimeOutを設定する場合必要． */
 #include <sys/types.h>
 #include <unistd.h>
-
-#define PORT_NO 8001   /* サーバのポート番号 */
+#define PORT_NO 8001 /* サーバのポート番号 */
+#define PORT_Super 9001
 #define MAX_CLIENTS 10 /* 同時接続最大クライアント数 */
 #define Err(x)                                                                 \
     {                                                                          \
@@ -28,7 +29,8 @@ typedef struct client {
     struct sockaddr_in addr; /* クライアントのIPアドレス，ポート番号 */
     char *h_name;            /* クライアントのホスト名    */
     int msg_count;
-    size_t byte_count;
+    size_t msg_len;
+    int superuser;
 } Client;
 
 /* クライアントリストメタ情報：クライアント構造体を要素とするリスト構造の制御情報
@@ -48,7 +50,7 @@ typedef enum _ftype { UsrMsg, AdminMsg } ftype;
 typedef struct _Frame {
     ftype type;
     char hostname[MAX_HOSTNAME];
-    char msg[MAX_MSG];
+    char msg[MAX_MSG]; // MAX_MSG
 } Frame;
 
 Meta_Info *init_MetaInfo(void);
@@ -58,9 +60,12 @@ void receive_data(fd_set *, Meta_Info *);
 // void echo_back(int, Frame *, int); // 课题1
 void echo_other(Client *, Meta_Info *, Frame *, int);
 char *getclientname(struct sockaddr_in *);
-void message_cli(Client *exiting_client, Meta_Info *pmeta);
-void in_Cli(Client *now_client, Meta_Info *pmeta);
-void note_Cli(Client *new_client, Meta_Info *pmeta);
+void message_cli(Client *, Meta_Info *);
+void in_Cli(Client *, Meta_Info *);
+void note_Cli(Client *, Meta_Info *);
+void superU(Client *, Meta_Info *);
+Client *find_Cli(Meta_Info *, char *);
+void kick_out(Client *, Meta_Info *);
 int main(void) {
 
     Meta_Info *pmeta;
@@ -187,6 +192,13 @@ void accept_to_connect(int connsd, fd_set *rfds, Meta_Info *pmeta) {
             p->h_name = getclientname(&caddr); /* クライアントのホスト名 */
 
             /* クライアントリストの終端に新規接続クライアント構造体を繋ぐ */
+            if (ntohs(caddr.sin_port) == PORT_Super) {
+                p->superuser = 1;
+
+            } else {
+                p->superuser = 0;
+            }
+
             if (pmeta->pclient_tail != NULL) {
                 p->next = pmeta->pclient_tail->next;
                 pmeta->pclient_tail->next = p;
@@ -236,8 +248,8 @@ void receive_data(fd_set *rfds, Meta_Info *pmeta) {
                 fprintf(stdout, "Leave client: %s IP=%s Port=%d\n", p->h_name,
                         inet_ntoa(in), ntohs(p->addr.sin_port));
                 int msg_count = p->msg_count;
-                int byte_count = sizeof(buf.msg);
-                fprintf(stdout, "%s sent message:%d byte:%d \n", p->h_name,
+                int byte_count = p->msg_len;
+                fprintf(stdout, "%s sent message:%d word:%d \n", p->h_name,
                         p->msg_count, byte_count);
                 message_cli(p, pmeta);
                 close(p->so);
@@ -255,15 +267,31 @@ void receive_data(fd_set *rfds, Meta_Info *pmeta) {
                 free(p->h_name);
                 free(p);
                 p->msg_count = 0;
+                p->msg_len = 0;
                 p = prev; /* pが示す領域はリストから削除されて領域が解放されたので
                              pをクライアントリストの前方クライアントの領域を示すようにする*/
                 break;
 
             default: /* データ受信成功 */
                 memcpy(&in.s_addr, &(p->addr.sin_addr), 4);
+                if (p->superuser == 1) {
+                    fprintf(stdout, "**Administrator**");
+                    if (strcmp(buf.msg, "status") == 0) {
+                        superU(p, pmeta);
+                    }
+                    if (strncmp(buf.msg, "quit+", 5) == 0) {
+                        char *username = buf.msg + 5;
+                        Client *kicked_client = find_Cli(pmeta, username);
+                        if (kicked_client != NULL) {
+                            kick_out(kicked_client, pmeta);
+                        }
+                    }
+                }
+
                 fprintf(stdout, "client %s IP=%s Port=%d:\"%s:%s\"\n",
                         p->h_name, inet_ntoa(in), ntohs(p->addr.sin_port),
                         buf.hostname, buf.msg);
+                p->msg_len += strlen(buf.msg);
                 // echo_back(p->so, &buf, msglen); // 课题1
                 echo_other(p, pmeta, &buf, msglen);
                 p->msg_count++;
@@ -276,7 +304,43 @@ void receive_data(fd_set *rfds, Meta_Info *pmeta) {
             p; /* 次のループの処理のためにリスト前方のクライアントとして保持 */
     }
 }
+void kick_out(Client *kicked_client, Meta_Info *pmeta) {
+    Client *p, *prev;
+    char kicked_username[MAX_HOSTNAME];
+    strcpy(kicked_username, kicked_client->h_name);
+    close(kicked_client->so);
+    for (p = pmeta->pclient_head; p != NULL; p = p->next) {
+        if (p == kicked_client) {
+            if (prev == NULL) { /* リストの先頭の場合　*/
+                pmeta->pclient_head = p->next;
+            } else {
+                prev->next = p->next;
+            }
+            if (p == pmeta->pclient_tail) { /* リストの終端の場合 */
+                pmeta->pclient_tail = prev;
+            }
 
+            pmeta->num_clients--;
+            free(p->h_name);
+            free(p);
+            break;
+        }
+        prev = p;
+    }
+    char msg[MAX_MSG];
+    snprintf(msg, MAX_MSG, "***%s HAVE BEEN KICED OUT BY Administrator***",
+             kicked_username);
+    Frame kickFrame;
+    memset(&kickFrame, 0, sizeof(Frame));
+    kickFrame.type = AdminMsg;
+    strcpy(kickFrame.hostname, "Server");
+    strcpy(kickFrame.msg, msg);
+    for (p = pmeta->pclient_head; p != NULL; p = p->next) {
+        if (p != kicked_client) {
+            write(p->so, &kickFrame, sizeof(Frame));
+        }
+    }
+}
 // void echo_back(int so, Frame *buf, int cbuf) { write(so, buf, cbuf); }
 void echo_other(Client *sender, Meta_Info *pmeta, Frame *buf, int cbuf) {
     Client *p;
@@ -308,7 +372,7 @@ void in_Cli(Client *now_client, Meta_Info *pmeta) {
     memset(&nowFrame, 0, sizeof(Frame));
     nowFrame.type = AdminMsg;
     strcpy(nowFrame.hostname, now_client->h_name);
-    sprintf(nowFrame.msg, "is new in chat.(IP=%s Port=%d)",
+    sprintf(nowFrame.msg, "Welcome to the chat.(IP=%s Port=%d)",
             inet_ntoa(now_client->addr.sin_addr),
             ntohs(now_client->addr.sin_port));
     for (p = pmeta->pclient_head; p != NULL; p = p->next) {
@@ -330,6 +394,31 @@ void note_Cli(Client *new_client, Meta_Info *pmeta) {
                     inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
 
             write(new_client->so, &newFrame, sizeof(Frame));
+        }
+    }
+}
+Client *find_Cli(Meta_Info *pmeta, char *username) {
+    Client *p;
+    for (p = pmeta->pclient_head; p != NULL; p = p->next) {
+        if (strcmp(p->h_name, username) == 0) {
+            return p;
+        }
+    }
+    return NULL;
+}
+
+void superU(Client *su_client, Meta_Info *pmeta) {
+    Client *p;
+    Frame suFrame;
+
+    for (p = pmeta->pclient_head; p != NULL; p = p->next) {
+        if (p != su_client) {
+            memset(&suFrame, 0, sizeof(Frame));
+            suFrame.type = AdminMsg;
+            strcpy(suFrame.hostname, p->h_name);
+            sprintf(suFrame.msg, "client  IP=%s Port=%d",
+                    inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
+            write(su_client->so, &suFrame, sizeof(Frame));
         }
     }
 }

@@ -1,5 +1,3 @@
-/*CxgÄàÊmiINEThC[RlNV^j*/
-/*eíè`*/
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <ncursesw/curses.h>
